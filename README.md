@@ -15,7 +15,7 @@ It manages Linux, Windows (Wine/Proton), and AppImage games with sandboxing via 
 
 See the full development roadmap here:
 
-👉 [ROADMAP.md](./ROADMAP.md)You 
+👉 [ROADMAP.md](./ROADMAP.md) 
 
 ### High-level milestones.
 
