@@ -12,4 +12,8 @@ export default defineConfig({
             ignored: ["**/src-tauri/**"],
         },
     },
+    build: {
+        outDir: "../dist",
+        emptyOutDir: true,
+    },
 });
