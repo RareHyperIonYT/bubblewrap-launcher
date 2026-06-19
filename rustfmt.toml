@@ -1,0 +1,8 @@
+max_width = 100
+tab_spaces = 4
+edition = "2021"
+
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"
+
+fn_args_layout = "Tall"
