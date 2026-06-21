@@ -1,20 +1,19 @@
 use super::storage::load_settings;
 use crate::models::*;
 
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
-use nix::sys::signal::{kill, Signal};
-use nix::unistd::Pid;
-
-use std::process::{Child, Command};
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::sync::Mutex;
 use std::fs;
+use std::path::PathBuf;
+use std::process::{Child, Command};
+use std::sync::Mutex;
+
+use crate::utility::dirs;
 
 // Process tracking for running games if it wasn't obvious.
-static RUNNING_GAMES: Lazy<Mutex<HashMap<String, Child>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+static RUNNING_GAMES: LazyLock<Mutex<HashMap<String, Child>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 fn expand_tilde(path: &str) -> PathBuf {
     if path == "~" {
@@ -169,12 +168,14 @@ pub async fn launch_game(game: Game) -> Result<(), String> {
 
             cmd.arg(format!("--private={}", sandbox_dir.to_string_lossy()));
             cmd.arg(&game.executable_path);
-        },
+        }
 
         GameType::Wine => {
             cmd = Command::new("firejail");
 
-            let wine = game.wine_exe.as_deref()
+            let wine = game
+                .wine_exe
+                .as_deref()
                 .filter(|s| !s.is_empty())
                 .unwrap_or(&settings.wine_default_path);
 
@@ -186,7 +187,10 @@ pub async fn launch_game(game: Game) -> Result<(), String> {
 
             cmd.arg(format!("--private={}", sandbox_dir.to_string_lossy()));
 
-            cmd.env("WINEDLLOVERRIDES", "winemenubuilder.exe=d;mshtml=d;jscript=d;vbscript=d;wshom.ocx=d;oleacc=d");
+            cmd.env(
+                "WINEDLLOVERRIDES",
+                "winemenubuilder.exe=d;mshtml=d;jscript=d;vbscript=d;wshom.ocx=d;oleacc=d",
+            );
             cmd.env("WINEDEBUG", "-all");
             cmd.env("BROWSER", "/bin/false");
             cmd.env("WINE_BROWSER", "/bin/false");
@@ -195,7 +199,13 @@ pub async fn launch_game(game: Game) -> Result<(), String> {
 
             cmd.arg(wine);
             cmd.arg(&game.executable_path);
-        },
+        }
+    }
+
+    let exe_path = PathBuf::from(&game.executable_path);
+
+    if let Some(game_dir) = exe_path.parent() {
+        cmd.arg(format!("--whitelist={}", game_dir.to_string_lossy()));
     }
 
     if let Some(ref args) = game.launch_args {
@@ -204,7 +214,9 @@ pub async fn launch_game(game: Game) -> Result<(), String> {
         }
     }
 
-    let child = cmd.spawn().map_err(|e| format!("Failed to launch: {}", e))?;
+    let child = cmd
+        .spawn()
+        .map_err(|e| format!("Failed to launch: {}", e))?;
 
     RUNNING_GAMES.lock().unwrap().insert(game.id.clone(), child);
 
@@ -216,8 +228,7 @@ pub fn stop_game(id: String) -> Result<(), String> {
     let mut map = RUNNING_GAMES.lock().unwrap();
 
     if let Some(child) = map.remove(&id) {
-        let pid = Pid::from_raw(child.id() as i32);
-        kill(pid, Signal::SIGTERM).map_err(|e| e.to_string())?;
+        sigterm(child.id()).map_err(|e| e.to_string())?;
     }
 
     Ok(())
@@ -241,4 +252,13 @@ pub fn is_game_running(id: String) -> bool {
     }
 
     false
+}
+
+fn sigterm(pid: u32) -> std::io::Result<()> {
+    let ret = unsafe { libc::kill(pid as libc::pid_t, libc::SIGTERM) };
+    if ret == 0 {
+        Ok(())
+    } else {
+        Err(std::io::Error::last_os_error())
+    }
 }

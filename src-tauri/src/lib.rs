@@ -1,5 +1,6 @@
 mod commands;
 mod models;
+mod utility;
 
 pub fn run() {
     // Tauri doesn't support Wayland due to problems upstream, this will allow it to run on Wayland.

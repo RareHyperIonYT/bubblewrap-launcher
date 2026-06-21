@@ -2,9 +2,11 @@ use crate::models::*;
 
 use serde::{Deserialize, Serialize};
 
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::path::PathBuf;
+use crate::utility::dirs;
+
 use std::fs;
+use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub fn data_dir() -> PathBuf {
     let mut path = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
